@@ -1,15 +1,4 @@
-# lark-hertz
-
-## Installation
-
-```bash
-go get github.com/hertz-contrib/lark-hertz
-```
-
-## Usage
-
-```go
-package main
+package lark_hertz_test
 
 import (
 	"context"
@@ -54,4 +43,3 @@ func main() {
 
 	// 4: deploy server to cloud, and set lark callback url to `<host>/api/lark_callback`
 }
-```
