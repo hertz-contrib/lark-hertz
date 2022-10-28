@@ -55,3 +55,7 @@ func main() {
 	// 4: deploy server to cloud, and set lark callback url to `<host>/api/lark_callback`
 }
 ```
+
+## License
+
+This project is under Apache License. See the [LICENSE](./LICENSE-APACHE) file for the full license text.
