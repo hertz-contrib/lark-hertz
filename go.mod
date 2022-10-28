@@ -3,8 +3,8 @@ module github.com/hertz-contrib/lark-hertz
 go 1.19
 
 require (
-	github.com/chyroc/lark v0.0.98
 	github.com/cloudwego/hertz v0.3.2
+	github.com/larksuite/oapi-sdk-go/v3 v3.0.8
 )
 
 require (

@@ -17,41 +17,74 @@
 package lark_hertz
 
 import (
-	"bytes"
 	"context"
-	"net/http"
+	"fmt"
 
-	"github.com/chyroc/lark"
 	"github.com/cloudwego/hertz/pkg/app"
-	"github.com/cloudwego/hertz/pkg/common/adaptor"
+	"github.com/cloudwego/hertz/pkg/protocol"
+	"github.com/cloudwego/hertz/pkg/protocol/consts"
+	"github.com/larksuite/oapi-sdk-go/v3/card"
+	"github.com/larksuite/oapi-sdk-go/v3/event"
+	"github.com/larksuite/oapi-sdk-go/v3/event/dispatcher"
 )
 
-type Option struct {
-	IgnoreCheckSignature bool
-}
+func doProcess(c context.Context, ctx *app.RequestContext, reqHandler larkevent.IReqHandler, options ...larkevent.OptionFunc) {
+	eventReq, err := translate(c, &ctx.Request)
+	if err != nil {
+		ctx.Response.SetStatusCode(consts.StatusInternalServerError)
+		ctx.Response.SetBodyString(err.Error())
+		return
+	}
 
-func WithIgnoreCheckSignature(b bool) func(option *Option) {
-	return func(option *Option) {
-		option.IgnoreCheckSignature = b
+	eventResp := reqHandler.Handle(c, eventReq)
+
+	err = write(c, &ctx.Response, eventResp)
+	if err != nil {
+		reqHandler.Logger().Error(c, fmt.Sprintf("write resp result error:%s", err.Error()))
 	}
 }
 
-// ListenCallback listen lark callback, return hertz app.HandlerFunc
-func ListenCallback(cli *lark.Lark, options ...func(option *Option)) app.HandlerFunc {
-	opt := new(Option)
-	for _, v := range options {
-		v(opt)
+func NewCardActionHandlerFunc(cardActionHandler *larkcard.CardActionHandler, options ...larkevent.OptionFunc) func(c context.Context, ctx *app.RequestContext) {
+	cardActionHandler.InitConfig(options...)
+	return func(c context.Context, ctx *app.RequestContext) {
+		doProcess(c, ctx, cardActionHandler, options...)
 	}
-	return func(ctx context.Context, c *app.RequestContext) {
-		header := http.Header{}
-		c.Request.Header.VisitAll(func(key, value []byte) {
-			header.Add(string(key), string(value))
-		})
-		body := bytes.NewReader(c.Request.Body())
-		if !opt.IgnoreCheckSignature {
-			cli.EventCallback.ListenSecurityCallback(ctx, header, body, adaptor.GetCompatResponseWriter(&c.Response))
-		} else {
-			cli.EventCallback.ListenCallback(ctx, body, adaptor.GetCompatResponseWriter(&c.Response))
+}
+
+func NewEventHandlerFunc(eventDispatcher *dispatcher.EventDispatcher, options ...larkevent.OptionFunc) func(c context.Context, ctx *app.RequestContext) {
+	eventDispatcher.InitConfig(options...)
+	return func(c context.Context, ctx *app.RequestContext) {
+		doProcess(c, ctx, eventDispatcher, options...)
+	}
+}
+
+func write(c context.Context, resp *protocol.Response, eventResp *larkevent.EventResp) error {
+	resp.SetStatusCode(eventResp.StatusCode)
+	for k, vs := range eventResp.Header {
+		for _, v := range vs {
+			resp.Header.Add(k, v)
 		}
 	}
+
+	if len(eventResp.Body) > 0 {
+		resp.SetBody(eventResp.Body)
+		return nil
+	}
+	return nil
+}
+
+func translate(ctx context.Context, req *protocol.Request) (*larkevent.EventReq, error) {
+	headers := make(map[string][]string)
+	req.Header.VisitAll(func(key, value []byte) {
+		keyStr := string(key)
+		valueStr := string(value)
+		headers[keyStr] = append(headers[keyStr], valueStr)
+	})
+
+	eventReq := &larkevent.EventReq{
+		Header: headers,
+		Body:   req.Body(),
+	}
+
+	return eventReq, nil
 }
