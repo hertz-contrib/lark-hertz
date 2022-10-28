@@ -1,5 +1,7 @@
 # lark-hertz (This is a community driven project)
 
+an [oapi-sdk-go](https://github.com/larksuite/oapi-sdk-go) extension package that integrates the hertz web framework
+
 ## Installation
 
 ```bash
@@ -15,43 +17,52 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/chyroc/lark"
 	"github.com/cloudwego/hertz/pkg/app/server"
-	"github.com/hertz-contrib/lark-hertz"
+	lark_hertz "github.com/hertz-contrib/lark-hertz"
+	larkcard "github.com/larksuite/oapi-sdk-go/v3/card"
+	larkcore "github.com/larksuite/oapi-sdk-go/v3/core"
+	"github.com/larksuite/oapi-sdk-go/v3/event/dispatcher"
+	larkcontact "github.com/larksuite/oapi-sdk-go/v3/service/contact/v3"
+	larkim "github.com/larksuite/oapi-sdk-go/v3/service/im/v1"
 )
-
 func main() {
-	// 1: init lark client
-	larkCli := lark.New(
-		lark.WithAppCredential("", ""),
-		lark.WithEventCallbackVerify("", ""),
-	)
-
-	// 2: register lark msg callback login
-	// handle text, file, image and send response
-	larkCli.EventCallback.HandlerEventV2IMMessageReceiveV1(func(ctx context.Context, cli *lark.Lark, schema string, header *lark.EventHeaderV2, event *lark.EventV2IMMessageReceiveV1) (string, error) {
-		content, err := lark.UnwrapMessageContent(event.Message.MessageType, event.Message.Content)
-		if err != nil {
-			return "", err
-		}
-		switch event.Message.MessageType {
-		case lark.MsgTypeText:
-			_, _, err = cli.Message.Reply(event.Message.MessageID).SendText(ctx, fmt.Sprintf("got text: %s", content.Text.Text))
-		case lark.MsgTypeFile:
-			_, _, err = cli.Message.Reply(event.Message.MessageID).SendText(ctx, fmt.Sprintf("got file: %s, key: %s", content.File.FileName, content.File.FileKey))
-		case lark.MsgTypeImage:
-			_, _, err = cli.Message.Reply(event.Message.MessageID).SendText(ctx, fmt.Sprintf("got image: %s", content.Image.ImageKey))
-		}
-		return "", err
+	// create event handler
+	handler := dispatcher.NewEventDispatcher("v", "1212121212").OnP2MessageReceiveV1(func(ctx context.Context, event *larkim.P2MessageReceiveV1) error {
+		fmt.Println(larkcore.Prettify(event))
+		fmt.Println(event.RequestId())
+		return nil
+	}).OnP2MessageReadV1(func(ctx context.Context, event *larkim.P2MessageReadV1) error {
+		fmt.Println(larkcore.Prettify(event))
+		fmt.Println(event.RequestId())
+		return nil
+	}).OnP2UserCreatedV3(func(ctx context.Context, event *larkcontact.P2UserCreatedV3) error {
+		fmt.Println(larkcore.Prettify(event))
+		fmt.Println(event.RequestId())
+		return nil
 	})
 
-	// 3: init hertz server
-	h := server.Default()
-	h.POST("/api/lark_callback", lark_hertz.ListenCallback(larkCli, lark_hertz.WithIgnoreCheckSignature(true)))
+	// create card action handler.
+	cardHandler := larkcard.NewCardActionHandler("v", "", func(ctx context.Context, cardAction *larkcard.CardAction) (interface{}, error) {
+		fmt.Println(larkcore.Prettify(cardAction))
 
+		// return card
+		// return getCard(),nil
+
+		// return custom resp
+		// return getCustomResp(),nil
+
+		// return nil
+		return nil, nil
+	})
+
+	// register handler
+	h := server.Default(server.WithHostPorts(":9999"))
+
+	h.POST("/webhook/event", lark_hertz.NewEventHandlerFunc(handler))
+	h.POST("/webhook/card", lark_hertz.NewCardActionHandlerFunc(cardHandler))
+
+	// start server
 	h.Spin()
-
-	// 4: deploy server to cloud, and set lark callback url to `<host>/api/lark_callback`
 }
 ```
 
