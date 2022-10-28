@@ -1,4 +1,4 @@
-# lark-hertz
+# lark-hertz (This is a community driven project)
 
 ## Installation
 
@@ -17,7 +17,6 @@ import (
 
 	"github.com/chyroc/lark"
 	"github.com/cloudwego/hertz/pkg/app/server"
-
 	"github.com/hertz-contrib/lark-hertz"
 )
 

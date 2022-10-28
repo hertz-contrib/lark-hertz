@@ -22,7 +22,6 @@ import (
 
 	"github.com/chyroc/lark"
 	"github.com/cloudwego/hertz/pkg/app/server"
-
 	"github.com/hertz-contrib/lark-hertz"
 )
 

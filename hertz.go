@@ -23,6 +23,7 @@ import (
 
 	"github.com/chyroc/lark"
 	"github.com/cloudwego/hertz/pkg/app"
+	"github.com/cloudwego/hertz/pkg/common/adaptor"
 )
 
 type Option struct {
@@ -48,30 +49,9 @@ func ListenCallback(cli *lark.Lark, options ...func(option *Option)) app.Handler
 		})
 		body := bytes.NewReader(c.Request.Body())
 		if !opt.IgnoreCheckSignature {
-			cli.EventCallback.ListenSecurityCallback(ctx, header, body, &hertzResponseWriter{c})
+			cli.EventCallback.ListenSecurityCallback(ctx, header, body, adaptor.GetCompatResponseWriter(&c.Response))
 		} else {
-			cli.EventCallback.ListenCallback(ctx, body, &hertzResponseWriter{c})
+			cli.EventCallback.ListenCallback(ctx, body, adaptor.GetCompatResponseWriter(&c.Response))
 		}
 	}
-}
-
-type hertzResponseWriter struct {
-	ctx *app.RequestContext
-}
-
-func (r *hertzResponseWriter) Header() http.Header {
-	header := http.Header{}
-	r.ctx.Response.Header.VisitAll(func(key, value []byte) {
-		header.Add(string(key), string(value))
-	})
-	return header
-}
-
-func (r *hertzResponseWriter) Write(i []byte) (int, error) {
-	r.ctx.Response.SetBodyRaw(i)
-	return len(i), nil
-}
-
-func (r *hertzResponseWriter) WriteHeader(statusCode int) {
-	r.ctx.Response.SetStatusCode(statusCode)
 }
